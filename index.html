@@ -1,0 +1,509 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GasTrack PH | Real-Time Fuel Monitor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background:
+                radial-gradient(circle at top left, rgba(37, 99, 235, 0.18), transparent 30%),
+                radial-gradient(circle at top right, rgba(16, 185, 129, 0.14), transparent 28%),
+                #0f172a;
+            color: #f8fafc;
+        }
+
+        .glass-card {
+            background: rgba(30, 41, 59, 0.72);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .modal-backdrop {
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(8px);
+        }
+
+        .glow-red {
+            border-color: rgba(244, 63, 94, 0.6) !important;
+            box-shadow: 0 0 25px rgba(244, 63, 94, 0.25);
+            background: rgba(244, 63, 94, 0.05);
+        }
+
+        .glow-green {
+            border-color: rgba(16, 185, 129, 0.6) !important;
+            box-shadow: 0 0 25px rgba(16, 185, 129, 0.25);
+            background: rgba(16, 185, 129, 0.05);
+        }
+
+        .themed-select {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%2394a3b8' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 0.75rem center;
+            background-size: 1.2rem;
+            cursor: pointer;
+        }
+
+        .brand-petron { color: #2563eb; }
+        .brand-shell { color: #fbbf24; text-shadow: 0 0 8px rgba(251, 191, 36, 0.3); }
+        .brand-caltex { color: #ef4444; }
+        .brand-cleanfuel { color: #22c55e; }
+        .brand-seaoil { color: #06b6d4; }
+        .brand-unioil { color: #4f46e5; }
+        .brand-phoenix { color: #f97316; }
+        .brand-default { color: #f8fafc; }
+
+        .fuel-badge-unleaded { background: #10b98122; border: 1px solid #10b98144; color: #34d399; }
+        .fuel-badge-premium { background: #3b82f622; border: 1px solid #3b82f644; color: #60a5fa; }
+        .fuel-badge-diesel { background: #eab30822; border: 1px solid #eab30844; color: #facc15; }
+        .fuel-badge-premiumdiesel { background: #d9770622; border: 1px solid #d9770644; color: #fbbf24; }
+        .fuel-badge-egasoline { background: #db277722; border: 1px solid #db277744; color: #f472b6; }
+        .fuel-badge-kerosene { background: #f9731622; border: 1px solid #f9731644; color: #fb923c; }
+        .fuel-badge-racing { background: #7e22ce22; border: 1px solid #7e22ce44; color: #a855f7; }
+
+        select option {
+            background-color: #1e293b;
+            color: white;
+        }
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-8">
+    <div class="max-w-6xl mx-auto">
+        <header class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+            <div>
+                <h1 class="text-3xl font-800 tracking-tight flex items-center gap-2">
+                    <i class="fas fa-gas-pump text-blue-500"></i> GasTrack <span class="text-blue-500">PH</span>
+                </h1>
+                <p class="text-slate-400 text-sm mt-1">Live pricing monitor with one-click local sync.</p>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-3">
+                <button id="refreshBtn" class="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 shadow-lg shadow-emerald-900/20">
+                    <i class="fas fa-rotate"></i> <span id="refreshLabel">Update Live Prices</span>
+                </button>
+            </div>
+        </header>
+
+        <div id="statusBanner" class="glass-card mb-6 rounded-2xl px-4 py-3 text-sm text-slate-300 border-blue-500/20">
+            Start the local server, then this dashboard will auto-load the last synced dataset.
+        </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <div class="glass-card p-4 rounded-2xl flex flex-col items-center justify-center">
+                <p class="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1">Avg Diesel</p>
+                <div class="text-2xl font-800 text-yellow-500/90" id="avgDiesel">&#8369;0.00</div>
+            </div>
+            <div class="glass-card p-4 rounded-2xl flex flex-col items-center justify-center">
+                <p class="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1">Avg 95 Gas</p>
+                <div class="text-2xl font-800 text-blue-400" id="avgGas">&#8369;0.00</div>
+            </div>
+            <div class="glass-card p-4 rounded-2xl flex flex-col items-center justify-center border-emerald-500/20">
+                <p class="text-emerald-400 text-[10px] font-bold uppercase tracking-wider mb-1">Best Value</p>
+                <div class="text-lg font-800 text-emerald-400 truncate w-full text-center" id="cheapestBrand">-</div>
+            </div>
+            <div class="glass-card p-4 rounded-2xl flex flex-col items-center justify-center border-red-500/20">
+                <p class="text-red-400 text-[10px] font-bold uppercase tracking-wider mb-1">Avoid Price</p>
+                <div class="text-lg font-800 text-red-400 truncate w-full text-center" id="mostExpensiveBrand">-</div>
+            </div>
+        </div>
+
+        <div class="flex flex-col gap-4 mb-8">
+            <div class="flex flex-col md:flex-row gap-4">
+                <div class="relative flex-1">
+                    <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-500"></i>
+                    <input type="text" id="stationSearch" placeholder="Search station or brand..." class="glass-card w-full pl-12 pr-4 py-3 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-500">
+                </div>
+                <div class="relative w-full md:w-64">
+                    <select id="locationSelector" class="glass-card themed-select w-full pl-4 pr-10 py-3 rounded-2xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">No cached data yet</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap gap-3 items-center">
+                <div class="flex items-center gap-2 glass-card pl-4 pr-1 py-1 rounded-xl">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase">Sort:</span>
+                    <select id="sortOrder" class="themed-select bg-transparent text-xs font-bold focus:outline-none py-2 pl-1 pr-8">
+                        <option value="default">Default</option>
+                        <option value="price-asc">Lowest 95 First</option>
+                        <option value="price-desc">Highest 95 First</option>
+                        <option value="name-asc">Brand A-Z</option>
+                    </select>
+                </div>
+
+                <div class="flex items-center gap-2 glass-card pl-4 pr-1 py-1 rounded-xl">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase">Brand:</span>
+                    <select id="brandFilter" class="themed-select bg-transparent text-xs font-bold focus:outline-none py-2 pl-1 pr-8">
+                        <option value="all">All Brands</option>
+                    </select>
+                </div>
+
+                <div class="ml-auto text-[10px] text-slate-500 font-bold uppercase tracking-widest hidden md:block">
+                    Showing <span id="filteredCount" class="text-blue-400">0</span> unique stations
+                </div>
+            </div>
+        </div>
+
+        <div id="priceGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+
+        <div id="detailModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+            <div class="absolute inset-0 modal-backdrop" onclick="closeModal()"></div>
+            <div class="glass-card w-full max-w-md rounded-3xl p-6 relative z-10 border-white/20">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 id="modalBrand" class="text-xl font-800">Station Details</h2>
+                    <button onclick="closeModal()" class="text-slate-400 hover:text-white transition-colors text-xl">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div id="modalContent" class="grid grid-cols-1 gap-3"></div>
+                <div class="mt-4 p-4 bg-blue-500/10 border border-blue-500/30 rounded-2xl">
+                    <p class="text-[9px] text-blue-400 font-bold uppercase mb-1">GasWatch Last Update</p>
+                    <p class="text-sm font-bold" id="modalDate">-</p>
+                </div>
+                <div class="mt-8 pt-6 border-t border-white/10">
+                    <button onclick="closeModal()" class="w-full bg-slate-700 hover:bg-slate-600 py-3 rounded-xl font-bold transition-all text-sm">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <footer class="mt-12 py-8 border-t border-white/5">
+            <p class="text-slate-500 text-xs text-center">
+                System Status: <span id="lastUpdated" class="text-slate-300">Waiting for local sync</span>
+            </p>
+        </footer>
+    </div>
+
+    <script>
+        const FUEL_STYLE = {
+            unleaded: { name: 'Unleaded 91', class: 'fuel-badge-unleaded', color: 'text-emerald-400' },
+            premium: { name: 'Premium 95', class: 'fuel-badge-premium', color: 'text-blue-400' },
+            premium95: { name: 'Premium 95', class: 'fuel-badge-premium', color: 'text-blue-400' },
+            diesel: { name: 'Diesel', class: 'fuel-badge-diesel', color: 'text-yellow-500' },
+            premiumdiesel: { name: 'Premium Diesel', class: 'fuel-badge-premiumdiesel', color: 'text-amber-500' },
+            egasoline: { name: 'E-Gasoline', class: 'fuel-badge-egasoline', color: 'text-pink-400' },
+            kerosene: { name: 'Kerosene', class: 'fuel-badge-kerosene', color: 'text-orange-400' },
+            premium97: { name: 'Premium 97', class: 'fuel-badge-racing', color: 'text-purple-400' },
+            racing: { name: 'Racing 100', class: 'fuel-badge-racing', color: 'text-purple-400' }
+        };
+
+        const BRAND_COLORS = {
+            petron: 'brand-petron',
+            shell: 'brand-shell',
+            caltex: 'brand-caltex',
+            cleanfuel: 'brand-cleanfuel',
+            seaoil: 'brand-seaoil',
+            unioil: 'brand-unioil',
+            phoenix: 'brand-phoenix'
+        };
+        const AUTO_REFRESH_INTERVAL_MS = 300000;
+
+        const locSelector = document.getElementById('locationSelector');
+        const searchInput = document.getElementById('stationSearch');
+        const sortSelector = document.getElementById('sortOrder');
+        const brandSelector = document.getElementById('brandFilter');
+        const grid = document.getElementById('priceGrid');
+        const refreshBtn = document.getElementById('refreshBtn');
+        const refreshLabel = document.getElementById('refreshLabel');
+
+        let cityData = {};
+        let locations = [];
+        let isSyncing = false;
+
+        function formatPeso(value) {
+            return `₱${value.toFixed(2)}`;
+        }
+
+        function getBrandClass(brand) {
+            return BRAND_COLORS[(brand || '').toLowerCase()] || 'brand-default';
+        }
+
+        function setStatus(message, tone = 'info') {
+            const statusBanner = document.getElementById('statusBanner');
+            const toneClasses = {
+                info: 'border-blue-500/20 text-slate-300',
+                success: 'border-emerald-500/30 text-emerald-200',
+                warning: 'border-amber-500/30 text-amber-200',
+                error: 'border-red-500/30 text-red-200'
+            };
+            statusBanner.className = `glass-card mb-6 rounded-2xl px-4 py-3 text-sm ${toneClasses[tone] || toneClasses.info}`;
+            statusBanner.textContent = message;
+        }
+
+        function updateBrandFilter(stations) {
+            const currentVal = brandSelector.value;
+            const brands = [...new Set(stations.map(station => station.brand))].sort((a, b) => a.localeCompare(b));
+            brandSelector.innerHTML = '<option value="all">All Brands</option>';
+            brands.forEach(brand => {
+                const option = document.createElement('option');
+                option.value = brand;
+                option.innerText = brand;
+                brandSelector.appendChild(option);
+            });
+            brandSelector.value = brands.includes(currentVal) ? currentVal : 'all';
+        }
+
+        function updateStats(stations) {
+            if (!stations.length) {
+                document.getElementById('avgGas').textContent = '₱0.00';
+                document.getElementById('avgDiesel').textContent = '₱0.00';
+                document.getElementById('cheapestBrand').innerText = '-';
+                document.getElementById('mostExpensiveBrand').innerText = '-';
+                return null;
+            }
+
+            const validGas = stations.filter(station => station.prices.premium95 || station.prices.premium || station.prices.unleaded);
+            const validDiesel = stations.filter(station => station.prices.diesel || station.prices.premiumdiesel);
+            const avgGas = validGas.length
+                ? validGas.reduce((sum, station) => sum + (station.prices.premium95 || station.prices.premium || station.prices.unleaded), 0) / validGas.length
+                : 0;
+            const avgDiesel = validDiesel.length
+                ? validDiesel.reduce((sum, station) => sum + (station.prices.diesel || station.prices.premiumdiesel), 0) / validDiesel.length
+                : 0;
+            const sortedByGas = [...stations].sort((left, right) => {
+                const leftPrice = left.prices.premium95 || left.prices.premium || left.prices.unleaded || 999;
+                const rightPrice = right.prices.premium95 || right.prices.premium || right.prices.unleaded || 999;
+                return leftPrice - rightPrice;
+            });
+
+            document.getElementById('avgGas').textContent = formatPeso(avgGas);
+            document.getElementById('avgDiesel').textContent = formatPeso(avgDiesel);
+            document.getElementById('cheapestBrand').innerText = sortedByGas[0].brand;
+            document.getElementById('mostExpensiveBrand').innerText = sortedByGas[sortedByGas.length - 1].brand;
+
+            return {
+                cheapestId: sortedByGas[0].id,
+                expensiveId: sortedByGas[sortedByGas.length - 1].id
+            };
+        }
+
+        function populateLocations() {
+            const currentValue = locSelector.value;
+            locSelector.innerHTML = '';
+
+            if (!locations.length) {
+                locSelector.innerHTML = '<option value="">No cached data yet</option>';
+                return;
+            }
+
+            locations.forEach(location => {
+                const option = document.createElement('option');
+                option.value = location.slug;
+                option.innerText = location.name;
+                locSelector.appendChild(option);
+            });
+
+            const nextValue = locations.some(location => location.slug === currentValue)
+                ? currentValue
+                : locations[0].slug;
+            locSelector.value = nextValue;
+        }
+
+        function renderPrices() {
+            const cityKey = locSelector.value;
+            const allStations = [...(cityData[cityKey] || [])];
+            const extremes = updateStats(allStations);
+
+            let stations = allStations;
+            const searchTerm = searchInput.value.toLowerCase().trim();
+            const sortMode = sortSelector.value;
+            const brandFilter = brandSelector.value;
+
+            if (searchTerm) {
+                stations = stations.filter(station =>
+                    station.brand.toLowerCase().includes(searchTerm) ||
+                    station.station.toLowerCase().includes(searchTerm)
+                );
+            }
+
+            if (brandFilter !== 'all') {
+                stations = stations.filter(station => station.brand === brandFilter);
+            }
+
+            if (sortMode === 'price-asc') {
+                stations.sort((left, right) => (left.prices.premium95 || left.prices.premium || 999) - (right.prices.premium95 || right.prices.premium || 999));
+            } else if (sortMode === 'price-desc') {
+                stations.sort((left, right) => (right.prices.premium95 || right.prices.premium || 0) - (left.prices.premium95 || left.prices.premium || 0));
+            } else if (sortMode === 'name-asc') {
+                stations.sort((left, right) => left.brand.localeCompare(right.brand));
+            }
+
+            grid.innerHTML = '';
+            document.getElementById('filteredCount').innerText = stations.length;
+
+            if (!stations.length) {
+                grid.innerHTML = '<div class="glass-card rounded-3xl p-6 text-slate-400">No stations match the current filters.</div>';
+                return;
+            }
+
+            stations.forEach(station => {
+                const card = document.createElement('div');
+                const brandClass = getBrandClass(station.brand);
+                const glowClass = station.id === extremes?.cheapestId
+                    ? 'glow-green'
+                    : station.id === extremes?.expensiveId
+                        ? 'glow-red'
+                        : 'border-white/5';
+                const card95 = station.prices.premium95 || station.prices.premium || 0;
+                const cardDiesel = station.prices.diesel || station.prices.premiumdiesel || 0;
+
+                card.className = `glass-card p-5 rounded-3xl border-2 ${glowClass} hover:border-blue-500/40 transition-all cursor-pointer`;
+                card.onclick = () => showDetails(station);
+                card.innerHTML = `
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center font-bold border border-white/10 shrink-0 ${brandClass}">${station.brand[0]}</div>
+                            <div>
+                                <h3 class="font-800 text-lg leading-tight ${brandClass}">${station.brand}</h3>
+                                <p class="text-slate-500 text-[11px] font-semibold uppercase line-clamp-1">${station.station}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="bg-blue-500/5 p-3 rounded-2xl border border-blue-500/10">
+                            <span class="text-[9px] uppercase text-blue-400 font-800 block mb-1">95 Premium</span>
+                            <div class="text-xl font-800 text-blue-400">${card95 > 0 ? `₱${card95.toFixed(2)}` : '--'}</div>
+                        </div>
+                        <div class="bg-yellow-500/5 p-3 rounded-2xl border border-yellow-500/10">
+                            <span class="text-[9px] uppercase text-yellow-500 font-800 block mb-1">Diesel</span>
+                            <div class="text-xl font-800 text-yellow-500/90">${cardDiesel > 0 ? `₱${cardDiesel.toFixed(2)}` : '--'}</div>
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function showDetails(station) {
+            document.getElementById('modalBrand').innerText = `${station.brand} - ${station.station}`;
+            document.getElementById('modalDate').innerText = station.last_updated || '-';
+
+            const priorityOrder = ['racing', 'premium97', 'premium95', 'premium', 'unleaded', 'egasoline', 'premiumdiesel', 'diesel', 'kerosene'];
+            const sortedFuels = Object.entries(station.prices).sort((left, right) => {
+                const leftIndex = priorityOrder.indexOf(left[0]);
+                const rightIndex = priorityOrder.indexOf(right[0]);
+                return (leftIndex === -1 ? 99 : leftIndex) - (rightIndex === -1 ? 99 : rightIndex);
+            });
+
+            document.getElementById('modalContent').innerHTML = sortedFuels.map(([key, price]) => {
+                const style = FUEL_STYLE[key] || { name: key, class: 'bg-slate-800/20 border-white/5', color: 'text-white' };
+                return `
+                    <div class="flex items-center justify-between p-4 ${style.class} rounded-2xl">
+                        <span class="font-bold text-sm">${style.name}</span>
+                        <span class="text-xl font-800 ${style.color}">₱${price.toFixed(2)}</span>
+                    </div>
+                `;
+            }).join('');
+
+            document.getElementById('detailModal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('detailModal').classList.add('hidden');
+        }
+
+        function applyDataset(dataset, sourceLabel) {
+            cityData = dataset.city_data || {};
+            locations = dataset.locations || [];
+            populateLocations();
+            updateBrandFilter(cityData[locSelector.value] || []);
+            renderPrices();
+
+            const syncedDate = dataset.synced_at ? new Date(dataset.synced_at).toLocaleString() : 'Unknown';
+            document.getElementById('lastUpdated').innerText = `${sourceLabel} | GasWatch: ${dataset.last_updated || 'Unknown'} | Local sync: ${syncedDate}`;
+        }
+
+        async function loadCachedPrices() {
+            try {
+                setStatus('Loading locally cached prices...', 'info');
+                const response = await fetch('/api/prices');
+                const payload = await response.json();
+
+                if (!response.ok) {
+                    setStatus(payload.message || 'No cache found yet. Fetching live data now...', 'warning');
+                    return false;
+                }
+
+                const ageSeconds = payload.meta?.cache_age_seconds;
+                const ageLabel = typeof ageSeconds === 'number'
+                    ? `Cache age: ${Math.floor(ageSeconds / 60)}m ${ageSeconds % 60}s.`
+                    : 'Cached fuel prices loaded successfully.';
+                applyDataset(payload.data, 'Cached data loaded');
+                setStatus(ageLabel, 'success');
+                return true;
+            } catch (error) {
+                setStatus('Could not reach the local backend. Run python server.py in the gastrackph folder.', 'error');
+                return false;
+            }
+        }
+
+        async function syncPrices({ force = false, silent = false } = {}) {
+            if (isSyncing) {
+                return;
+            }
+
+            isSyncing = true;
+            refreshBtn.disabled = true;
+            refreshLabel.textContent = force ? 'Refreshing...' : 'Syncing...';
+            if (!silent) {
+                setStatus(
+                    force
+                        ? 'Fetching the latest GasWatch PH dataset...'
+                        : 'Checking for fresh fuel prices...',
+                    'info'
+                );
+            }
+
+            try {
+                const response = await fetch(`/api/update${force ? '?force=1' : ''}`, { method: 'POST' });
+                const payload = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(payload.message || 'Update failed.');
+                }
+
+                applyDataset(payload.data, payload.meta?.refreshed ? 'Live update complete' : 'Live cache active');
+                if (!silent || payload.meta?.refreshed) {
+                    setStatus(payload.message || 'Fuel prices updated successfully.', 'success');
+                }
+            } catch (error) {
+                setStatus(error.message || 'Update failed.', 'error');
+            } finally {
+                isSyncing = false;
+                refreshBtn.disabled = false;
+                refreshLabel.textContent = 'Update Live Prices';
+            }
+        }
+
+        async function initializeDashboard() {
+            const hasCache = await loadCachedPrices();
+            if (!hasCache) {
+                await syncPrices({ force: false, silent: false });
+            } else {
+                syncPrices({ force: false, silent: true });
+            }
+
+            window.setInterval(() => {
+                syncPrices({ force: false, silent: true });
+            }, AUTO_REFRESH_INTERVAL_MS);
+        }
+
+        refreshBtn.onclick = () => syncPrices({ force: true, silent: false });
+        locSelector.onchange = () => {
+            updateBrandFilter(cityData[locSelector.value] || []);
+            renderPrices();
+        };
+        searchInput.oninput = renderPrices;
+        sortSelector.onchange = renderPrices;
+        brandSelector.onchange = renderPrices;
+
+        initializeDashboard();
+        window.closeModal = closeModal;
+    </script>
+</body>
+</html>
