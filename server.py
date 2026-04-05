@@ -14,7 +14,8 @@ from urllib.request import Request, urlopen
 
 # HOST = "127.0.0.1"
 HOST = "0.0.0.0"
-PORT = 8000
+# PORT = 8000
+PORT = int(os.environ.get("PORT", 10000)) # Default to 10000 if PORT isn't set
 DATA_URL = "https://gaswatchph.com/js/data.js"
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
