@@ -12,7 +12,8 @@ from urllib.parse import parse_qs, urlparse
 from urllib.request import Request, urlopen
 
 
-HOST = "127.0.0.1"
+# HOST = "127.0.0.1"
+HOST = "0.0.0.0"
 PORT = 8000
 DATA_URL = "https://gaswatchph.com/js/data.js"
 BASE_DIR = Path(__file__).resolve().parent
